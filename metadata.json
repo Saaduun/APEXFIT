@@ -1,0 +1,6 @@
+{
+  "name": "Gym & Martial Arts AI Coach",
+  "description": "Personalized AI training routines for weight training, martial arts, and hybrid athletes with interactive 3D human anatomy, biomechanics, nutrition, and recovery tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
