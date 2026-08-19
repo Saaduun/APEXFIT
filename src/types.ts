@@ -79,6 +79,8 @@ export type MuscleGroup =
   | 'tibialis';
 
 export type AnatomyLayerMode = 'muscular' | 'skeletal' | 'deep' | 'composite';
+export type AnatomyVisualTheme = 'weight_training_guide' | 'dark_slate';
+export type ExerciseMovementPhase = 'dual' | 'start' | 'peak';
 
 export interface MuscleDetail {
   id: MuscleGroup;

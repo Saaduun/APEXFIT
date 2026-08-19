@@ -1,7 +1,65 @@
 import { Exercise } from '../types';
 
 export const EXERCISE_DATABASE: Exercise[] = [
-  // 1. Incline Barbell Bench Press (Primary Anatomical Atlas Example)
+  // 1. Weight Plate Front Raise (Reference Medical Illustration Standard)
+  {
+    id: 'plate_front_raise',
+    name: 'Weight Plate Front Raise',
+    category: 'Weight Training',
+    subCategory: 'Deltoid & Upper Pectoral Isolation',
+    difficulty: 'Beginner',
+    targetMuscles: ['anterior_deltoid', 'upper_chest', 'lateral_deltoid', 'serratus_anterior'],
+    primaryMuscles: ['anterior_deltoid', 'upper_chest'],
+    secondaryMuscles: ['lateral_deltoid', 'serratus_anterior'],
+    stabilizingMuscles: ['traps', 'upper_back', 'forearms', 'abs', 'glutes'],
+    equipmentNeeded: ['Olympic Weight Plate (10kg / 20kg / 25lb / 45lb)'],
+    defaultSets: 3,
+    defaultReps: '10 - 12 reps',
+    defaultRestSec: 60,
+    startingPosition: 'Standing upright with feet shoulder-width apart, knees slightly unlocked, core braced. Hold an Olympic weight plate with both hands at the 3 o’clock and 9 o’clock positions, arms extended downwards resting in front of the pelvis/thighs.',
+    movementInstructions: [
+      'Inhale, engage your core, and retract your shoulder blades slightly to set the scapulae.',
+      'Exhale and raise the weight plate smoothly forward in a controlled arc until arms are parallel to the floor or slightly above shoulder level.',
+      'Hold the peak contraction for 1 second, focusing on maximal tension across the anterior deltoids, clavicular upper pectoralis, and serratus anterior.',
+      'Inhale and lower the weight plate under strict eccentric control back to the starting position in front of your thighs.',
+    ],
+    techniqueCues: [
+      'Keep elbows slightly soft (never hyperextended) throughout the entire movement arc.',
+      'Avoid swinging the hips or using lumbar momentum to initiate the lift.',
+      'Squeeze the upper chest and front deltoids hard at the apex of the movement.',
+    ],
+    commonMistakes: [
+      'Leaning backward excessively at the top of the lift, transferring tension into the lumbar spine.',
+      'Using excessive momentum and swinging the torso.',
+      'Bending the elbows too much, turning the raise into an upright row.',
+    ],
+    safetyConsiderations: [
+      'Select a moderate plate weight that allows strict form without hyperextending the lower back.',
+      'Maintain a secure neutral grip on the plate rim with thumbs hooked securely.',
+    ],
+    biomechanics: {
+      jointMovement: 'Glenohumeral shoulder flexion in the sagittal plane combined with scapular upward rotation and thoracic stabilization.',
+      rangeOfMotion: 'Shoulder flexion from 0° (neutral at hips) to ~90°-100° (horizontal/eye-level).',
+      bodyPosition: 'Erect standing anatomical posture with active spinal neutral alignment and braced abdominal cylinder.',
+      movementDirection: 'Anterior-superior curved sagittal arc.',
+      primaryForcePlane: 'Pure Sagittal Plane (0° to 90° elevation against gravity).',
+      primaryMuscles: ['Anterior Deltoid', 'Upper Pectoralis Major (Clavicular Head)'],
+      secondaryMuscles: ['Lateral Deltoid', 'Serratus Anterior (Lateral Thoracic Digitations)'],
+      stabilizingMuscles: ['Trapezius (Upper/Middle)', 'Rhomboids', 'Forearm Flexors & Extensors', 'Rectus Abdominis & Erector Spinae'],
+      notes: 'Classic isolated anterior chain exercise recruiting clavicular pectoralis fibers and scapular upward rotators.',
+    },
+    estimatedMuscleActivation: {
+      anterior_deltoid: 98,
+      upper_chest: 90,
+      lateral_deltoid: 82,
+      serratus_anterior: 78,
+      traps: 55,
+      forearms: 50,
+      abs: 42,
+    },
+  },
+
+  // 2. Incline Barbell Bench Press (Primary Anatomical Atlas Example)
   {
     id: 'incline_barbell_bench_press',
     name: 'Incline Barbell Bench Press',

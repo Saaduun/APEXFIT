@@ -16,6 +16,8 @@ import {
   Layers,
   ArrowRight,
   Maximize2,
+  Zap,
+  FastForward,
 } from 'lucide-react';
 
 interface WorkoutActiveScreenProps {
@@ -32,6 +34,10 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [sessionDurationSec, setSessionDurationSec] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(true);
+
+  // Auto-advance toggle (default enabled for seamless continuous flow)
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
+  const [autoAdvanceCountdown, setAutoAdvanceCountdown] = useState<number | null>(null);
 
   // Rest Timer State
   const [restTimerSec, setRestTimerSec] = useState(0);
@@ -94,9 +100,41 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
     return () => clearInterval(timer);
   }, [isRestTimerRunning, restTimerSec]);
 
+  // Auto-advance exercise countdown timer
+  useEffect(() => {
+    let timer: any;
+    if (autoAdvanceCountdown !== null && autoAdvanceCountdown > 0) {
+      timer = setInterval(() => {
+        setAutoAdvanceCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            // Trigger transition to next exercise
+            goToNextExercise();
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [autoAdvanceCountdown]);
+
   const startRestTimer = (seconds: number) => {
     setRestTimerSec(seconds);
     setIsRestTimerRunning(true);
+  };
+
+  const goToNextExercise = () => {
+    setAutoAdvanceCountdown(null);
+    if (currentExerciseIndex < session.exercises.length - 1) {
+      setCurrentExerciseIndex((prev) => prev + 1);
+    }
+  };
+
+  const goToPrevExercise = () => {
+    setAutoAdvanceCountdown(null);
+    if (currentExerciseIndex > 0) {
+      setCurrentExerciseIndex((prev) => prev - 1);
+    }
   };
 
   const toggleSetComplete = (setIndex: number) => {
@@ -104,10 +142,25 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
       const currentSets = [...(prev[currentExerciseIndex] || [])];
       const targetSet = currentSets[setIndex];
       if (targetSet) {
-        targetSet.completed = !targetSet.completed;
-        // If completed, trigger rest timer
-        if (targetSet.completed) {
+        const nextStatus = !targetSet.completed;
+        targetSet.completed = nextStatus;
+
+        // If completed
+        if (nextStatus) {
+          // Trigger rest timer
           startRestTimer(currentItem.restPeriodSec || 60);
+
+          // Check if all sets for this exercise are now finished
+          const allCompleted = currentSets.every((s) => s.completed);
+          if (allCompleted && autoAdvanceEnabled) {
+            if (currentExerciseIndex < session.exercises.length - 1) {
+              // Initiate 3-second auto-advance countdown to next exercise
+              setAutoAdvanceCountdown(3);
+            }
+          }
+        } else {
+          // Cancel auto advance if unchecking
+          setAutoAdvanceCountdown(null);
         }
       }
       return { ...prev, [currentExerciseIndex]: currentSets };
@@ -171,46 +224,106 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
     }, 1200);
   };
 
+  const currentSets = exerciseSets[currentExerciseIndex] || [];
+  const completedSetsCount = currentSets.filter((s) => s.completed).length;
+  const isExerciseFullyCompleted = currentSets.length > 0 && completedSetsCount === currentSets.length;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* Top Header Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900 border border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl">
         <div className="flex items-center gap-3">
           <button
             onClick={onExit}
-            className="p-2 rounded-xl bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition-colors"
+            className="p-2 rounded-2xl bg-slate-950 text-slate-400 hover:text-white border border-slate-800 transition-colors"
+            title="Exit Workout"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">
-              {session.sessionType} • Exercise {currentExerciseIndex + 1} of {session.exercises.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-orange-400 uppercase tracking-wider">
+                {session.sessionType}
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="text-[11px] text-slate-400 font-semibold">
+                Exercise {currentExerciseIndex + 1} of {session.exercises.length}
+              </span>
+            </div>
             <h2 className="text-lg font-bold text-white leading-tight">
               {session.title}
             </h2>
           </div>
         </div>
 
-        {/* Live Timers */}
+        {/* Live Timers & Finish Button */}
         <div className="flex items-center gap-3">
           {/* Session Timer */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-semibold text-slate-300">
-            <Clock className="w-3.5 h-3.5 text-rose-400" />
+          <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-slate-950 border border-slate-800 text-xs font-mono font-semibold text-slate-300">
+            <Clock className="w-4 h-4 text-orange-400" />
             <span>{formatTime(sessionDurationSec)}</span>
           </div>
+
+          {/* Auto-Advance Toggle */}
+          <button
+            onClick={() => setAutoAdvanceEnabled(!autoAdvanceEnabled)}
+            className={`px-3 py-2 rounded-2xl text-xs font-bold border transition-all flex items-center gap-1.5 ${
+              autoAdvanceEnabled
+                ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+                : 'bg-slate-950 text-slate-500 border-slate-800'
+            }`}
+            title="Auto-advance to next exercise upon completing all sets"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Auto-Next: {autoAdvanceEnabled ? 'ON' : 'OFF'}</span>
+          </button>
 
           {/* Complete Button */}
           <button
             id="btn-complete-workout"
             onClick={handleCompleteSession}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 flex items-center gap-1.5 transition-all active:scale-95"
+            className="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 flex items-center gap-1.5 transition-all active:scale-95"
           >
             <CheckCircle2 className="w-4 h-4" />
             Finish Workout
           </button>
         </div>
       </div>
+
+      {/* Auto-Advance Banner Alert */}
+      {autoAdvanceCountdown !== null && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-950/80 to-amber-950/80 border border-orange-500/40 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3">
+            <FastForward className="w-5 h-5 text-orange-400" />
+            <div>
+              <p className="text-sm font-bold text-white">
+                Exercise Completed! Moving to next exercise simultaneously in{' '}
+                <span className="text-orange-300 font-mono font-extrabold text-base">
+                  {autoAdvanceCountdown}s
+                </span>
+                ...
+              </p>
+              <p className="text-xs text-slate-300">
+                Next up: {session.exercises[currentExerciseIndex + 1]?.exercise.name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={goToNextExercise}
+              className="px-4 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold transition-all"
+            >
+              Skip Wait & Go Now
+            </button>
+            <button
+              onClick={() => setAutoAdvanceCountdown(null)}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white text-xs font-bold transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Dual-Column Interactive Stage */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -219,30 +332,35 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
           <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 shadow-xl">
             <div className="flex items-center justify-between mb-3 px-1">
               <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-rose-400" />
-                Muscle Activation Visualization
+                <Flame className="w-4 h-4 text-orange-400" />
+                Anatomical Exercise Plate (Figure A & B)
               </span>
-              <span className="text-[10px] text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                Educational Estimate
+              <span className="text-[10px] text-orange-300 bg-orange-950/50 px-2.5 py-0.5 rounded-full border border-orange-800/40 font-semibold">
+                {currentExercise.category}
               </span>
             </div>
 
-            {/* 3D WebGL Canvas */}
+            {/* 3D WebGL Canvas adapting dynamically to currentExercise */}
             <AnatomyViewer3D
-              height={360}
-              highlightedMuscles={currentExercise.estimatedMuscleActivation}
+              key={`active-viewer-${currentExercise.id}`}
+              exerciseId={currentExercise.id}
+              exerciseName={currentExercise.name}
+              targetMuscles={currentExercise.targetMuscles || []}
               primaryMuscles={currentExercise.primaryMuscles || currentExercise.targetMuscles || []}
               secondaryMuscles={currentExercise.secondaryMuscles || []}
               stabilizingMuscles={currentExercise.stabilizingMuscles || []}
+              highlightedMuscles={currentExercise.estimatedMuscleActivation}
               activeBiomechanics={currentExercise.biomechanics}
+              height={380}
               showControls={true}
               compact={true}
+              initialPhase="dual"
             />
 
             {/* Muscle Activation Progress Bars */}
             <div className="mt-4 space-y-2 pt-3 border-t border-slate-800">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                Primary & Secondary Drivers
+                Primary & Secondary Movers
               </span>
               {Object.entries(currentExercise.estimatedMuscleActivation || {}).map(
                 ([muscle, pct]) => (
@@ -253,7 +371,7 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 rounded-full bg-slate-800 overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500"
+                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -268,12 +386,12 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
           </div>
 
           {/* Rest Stopwatch Widget */}
-          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+          <div className="p-4 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-between shadow-lg">
             <div>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
                 Rest Period Timer
               </span>
-              <div className="text-2xl font-black font-mono text-rose-400">
+              <div className="text-2xl font-black font-mono text-orange-400">
                 {formatTime(restTimerSec)}
               </div>
             </div>
@@ -281,7 +399,7 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => startRestTimer(restTimerSec > 0 ? restTimerSec : currentItem.restPeriodSec || 60)}
-                className="p-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition-all shadow-md shadow-rose-950/30"
+                className="p-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-bold transition-all shadow-md shadow-orange-950/30"
               >
                 {isRestTimerRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
               </button>
@@ -311,7 +429,7 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
           <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20">
+                <span className="px-2.5 py-0.5 rounded text-[11px] font-semibold bg-orange-500/10 text-orange-300 border border-orange-500/20">
                   {currentExercise.category} • {currentExercise.difficulty}
                 </span>
                 <h1 className="text-2xl font-extrabold text-white mt-2">
@@ -323,21 +441,21 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
               </div>
 
               {/* Prev / Next Exercise Switcher */}
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-1 bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
                 <button
                   disabled={currentExerciseIndex === 0}
-                  onClick={() => setCurrentExerciseIndex((i) => Math.max(0, i - 1))}
+                  onClick={goToPrevExercise}
                   className="p-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title="Previous Exercise"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="text-xs font-bold text-slate-400 px-2 font-mono">
+                <span className="text-xs font-bold text-slate-300 px-2 font-mono">
                   {currentExerciseIndex + 1}/{session.exercises.length}
                 </span>
                 <button
                   disabled={currentExerciseIndex === session.exercises.length - 1}
-                  onClick={() => setCurrentExerciseIndex((i) => Math.min(session.exercises.length - 1, i + 1))}
+                  onClick={goToNextExercise}
                   className="p-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
                   title="Next Exercise"
                 >
@@ -359,7 +477,7 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
               {(exerciseSets[currentExerciseIndex] || []).map((set, setIdx) => (
                 <div
                   key={setIdx}
-                  className={`grid grid-cols-12 gap-2 items-center p-2.5 rounded-xl border transition-all ${
+                  className={`grid grid-cols-12 gap-2 items-center p-3 rounded-2xl border transition-all ${
                     set.completed
                       ? 'bg-emerald-950/20 border-emerald-500/40 text-white'
                       : 'bg-slate-950 border-slate-800'
@@ -379,7 +497,7 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
                       placeholder="0"
                       value={set.weightKg || ''}
                       onChange={(e) => updateSetWeight(setIdx, parseFloat(e.target.value) || 0)}
-                      className="w-full bg-slate-900 border border-slate-700 focus:border-rose-500 rounded-lg px-2.5 py-1 text-xs text-white font-mono"
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-orange-500 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                     />
                   </div>
 
@@ -388,18 +506,19 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
                       type="number"
                       value={set.reps}
                       onChange={(e) => updateSetReps(setIdx, parseInt(e.target.value) || 0)}
-                      className="w-full bg-slate-900 border border-slate-700 focus:border-rose-500 rounded-lg px-2 py-1 text-xs text-white font-mono"
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-orange-500 rounded-xl px-2 py-1.5 text-xs text-white font-mono"
                     />
                   </div>
 
                   <div className="col-span-2 flex justify-end">
                     <button
                       onClick={() => toggleSetComplete(setIdx)}
-                      className={`p-1.5 rounded-lg transition-all ${
+                      className={`p-2 rounded-xl transition-all ${
                         set.completed
                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-900/40'
-                          : 'bg-slate-900 text-slate-500 hover:text-slate-200 border border-slate-700'
+                          : 'bg-slate-900 text-slate-500 hover:text-white border border-slate-700 hover:border-emerald-500'
                       }`}
+                      title={set.completed ? 'Completed' : 'Mark set completed'}
                     >
                       <CheckCircle2 className="w-4 h-4" />
                     </button>
@@ -407,122 +526,115 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
                 </div>
               ))}
             </div>
+
+            {/* Next Exercise Quick Bar when fully completed */}
+            {isExerciseFullyCompleted && currentExerciseIndex < session.exercises.length - 1 && (
+              <div className="p-3.5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  All sets logged!
+                </span>
+                <button
+                  onClick={goToNextExercise}
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-400 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-orange-950/40"
+                >
+                  <span>Next: {session.exercises[currentExerciseIndex + 1]?.exercise.name}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Technical Guidance Tabs: Instructions, Biomechanics, Safety */}
+          {/* Technical Guidance & Biomechanics Tabs */}
           <div className="p-6 rounded-3xl bg-slate-900 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
               <button
                 onClick={() => setActiveTab('technique')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === 'technique'
-                    ? 'bg-rose-600 text-white'
+                    ? 'bg-orange-500 text-white'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Technique & Cues
+                Technique Cues
               </button>
               <button
                 onClick={() => setActiveTab('biomechanics')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === 'biomechanics'
-                    ? 'bg-rose-600 text-white'
+                    ? 'bg-orange-500 text-white'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Biomechanics Panel
+                Biomechanics
               </button>
               <button
                 onClick={() => setActiveTab('safety')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   activeTab === 'safety'
-                    ? 'bg-rose-600 text-white'
+                    ? 'bg-orange-500 text-white'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Safety & Common Faults
+                Safety & Common Mistakes
               </button>
             </div>
 
-            {/* Tab Content: Technique */}
             {activeTab === 'technique' && (
-              <div className="space-y-4 text-xs">
-                <div>
-                  <span className="font-bold text-slate-300 block mb-1">Starting Position:</span>
-                  <p className="text-slate-400 leading-relaxed bg-slate-950 p-3 rounded-xl border border-slate-800/80">
-                    {currentExercise.startingPosition}
-                  </p>
-                </div>
-
-                <div>
-                  <span className="font-bold text-slate-300 block mb-1">Step-by-Step Movement:</span>
-                  <ul className="space-y-1.5 list-disc pl-4 text-slate-400 leading-relaxed">
-                    {currentExercise.movementInstructions.map((inst, i) => (
-                      <li key={i}>{inst}</li>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  <strong className="text-white">Starting Stance:</strong> {currentExercise.startingPosition}
+                </p>
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Execution Steps
+                  </span>
+                  <ol className="space-y-2 text-xs text-slate-300">
+                    {currentExercise.movementInstructions.map((step, idx) => (
+                      <li key={idx} className="flex items-start gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center font-mono text-[10px] text-orange-400 flex-shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed">{step}</span>
+                      </li>
                     ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <span className="font-bold text-slate-300 block mb-1">Key Technique Cues:</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {currentExercise.techniqueCues.map((cue, i) => (
-                      <div key={i} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-slate-300 flex items-center gap-2">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                        <span>{cue}</span>
-                      </div>
-                    ))}
-                  </div>
+                  </ol>
                 </div>
               </div>
             )}
 
-            {/* Tab Content: Biomechanics */}
             {activeTab === 'biomechanics' && (
               <div className="space-y-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-300">Joint Movement:</span>
-                    <span className="text-slate-400 text-right">{currentExercise.biomechanics.jointMovement}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                    <span className="text-slate-400">Joint Articulation:</span>
+                    <p className="text-white font-semibold">{currentExercise.biomechanics.jointMovement}</p>
                   </div>
-                  <div className="flex items-center justify-between border-t border-slate-800/60 pt-2">
-                    <span className="font-bold text-slate-300">Estimated Range of Motion:</span>
-                    <span className="text-slate-400 text-right">{currentExercise.biomechanics.rangeOfMotion}</span>
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                    <span className="text-slate-400">Range of Motion:</span>
+                    <p className="text-white font-semibold">{currentExercise.biomechanics.rangeOfMotion}</p>
                   </div>
-                  <div className="flex items-center justify-between border-t border-slate-800/60 pt-2">
-                    <span className="font-bold text-slate-300">Primary Force Plane:</span>
-                    <span className="text-slate-400">{currentExercise.biomechanics.primaryForcePlane}</span>
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                    <span className="text-slate-400">Body Position:</span>
+                    <p className="text-white font-semibold">{currentExercise.biomechanics.bodyPosition}</p>
                   </div>
-                  <div className="flex items-center justify-between border-t border-slate-800/60 pt-2">
-                    <span className="font-bold text-slate-300">Stabilizing Muscles:</span>
-                    <span className="text-slate-400">{currentExercise.biomechanics.stabilizingMuscles.join(', ')}</span>
+                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1">
+                    <span className="text-slate-400">Force Plane:</span>
+                    <p className="text-white font-semibold">{currentExercise.biomechanics.primaryForcePlane}</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500 italic">
-                  * Note: {currentExercise.biomechanics.notes}
-                </p>
               </div>
             )}
 
-            {/* Tab Content: Safety & Common Mistakes */}
             {activeTab === 'safety' && (
-              <div className="space-y-4 text-xs">
-                <div>
-                  <span className="font-bold text-rose-400 block mb-1.5 flex items-center gap-1.5">
-                    <ShieldAlert className="w-4 h-4 text-rose-400" /> Common Mistakes to Avoid:
+              <div className="space-y-3 text-xs">
+                <div className="p-4 rounded-2xl bg-rose-950/20 border border-rose-500/30 space-y-2">
+                  <span className="text-rose-400 font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4" /> Common Faults to Avoid
                   </span>
-                  <ul className="space-y-1.5 list-disc pl-4 text-slate-400 leading-relaxed">
-                    {currentExercise.commonMistakes.map((mistake, i) => (
-                      <li key={i}>{mistake}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <span className="font-bold text-emerald-400 block mb-1.5">Safety Considerations:</span>
-                  <ul className="space-y-1.5 list-disc pl-4 text-slate-400 leading-relaxed">
-                    {currentExercise.safetyConsiderations.map((safety, i) => (
-                      <li key={i}>{safety}</li>
+                  <ul className="list-disc pl-4 space-y-1 text-slate-300">
+                    {currentExercise.commonMistakes.map((mistake, idx) => (
+                      <li key={idx}>{mistake}</li>
                     ))}
                   </ul>
                 </div>
@@ -531,21 +643,6 @@ export const WorkoutActiveScreen: React.FC<WorkoutActiveScreenProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Celebration Overlay */}
-      {showCelebration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md">
-          <div className="text-center p-8 rounded-3xl bg-slate-900 border border-slate-800 max-w-md shadow-2xl space-y-4 animate-in fade-in zoom-in duration-300">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10" />
-            </div>
-            <h3 className="text-2xl font-extrabold text-white">Workout Complete!</h3>
-            <p className="text-xs text-slate-400">
-              Great training effort. Your session has been recorded into your progress log. Rehydrate and refuel!
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

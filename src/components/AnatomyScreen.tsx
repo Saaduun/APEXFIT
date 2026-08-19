@@ -334,7 +334,10 @@ export const AnatomyScreen: React.FC = () => {
               </div>
 
               <AnatomyViewer3D
-                height={420}
+                key={`biomech-viewer-${activeBiomechanicsExercise.id}`}
+                exerciseId={activeBiomechanicsExercise.id}
+                exerciseName={activeBiomechanicsExercise.name}
+                targetMuscles={activeBiomechanicsExercise.targetMuscles || []}
                 primaryMuscles={primaryMuscles}
                 secondaryMuscles={secondaryMuscles}
                 stabilizingMuscles={stabilizingMuscles}
